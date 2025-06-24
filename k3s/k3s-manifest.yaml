@@ -1,0 +1,370 @@
+# Cheshire Cat AI - K3s Production Deployment
+# This manifest contains all core Kubernetes resources for the Cheshire Cat AI deployment
+# Secrets and ConfigMaps are managed separately for security and configuration management
+
+---
+# Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: cheshire-cat
+  labels:
+    name: cheshire-cat
+
+---
+# Persistent Volume Claims
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qdrant-storage-pvc
+  namespace: cheshire-cat
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: local-path
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: static-pvc
+  namespace: cheshire-cat
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: local-path
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plugins-pvc
+  namespace: cheshire-cat
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: local-path
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-pvc
+  namespace: cheshire-cat
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: local-path
+
+---
+# Qdrant Vector Database Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qdrant
+  namespace: cheshire-cat
+  labels:
+    app: qdrant
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: qdrant
+  template:
+    metadata:
+      labels:
+        app: qdrant
+    spec:
+      containers:
+      - name: qdrant
+        image: qdrant/qdrant:latest
+        ports:
+        - containerPort: 6333
+        env:
+        - name: QDRANT__SERVICE__API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cheshire-cat-secrets
+              key: QDRANT_API_KEY
+        - name: QDRANT__SERVICE__ENABLE_TLS
+          value: "false"
+        - name: QDRANT__LOG_LEVEL
+          value: "INFO"
+        volumeMounts:
+        - name: qdrant-storage
+          mountPath: /qdrant/storage
+        livenessProbe:
+          tcpSocket:
+            port: 6333
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          tcpSocket:
+            port: 6333
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+      volumes:
+      - name: qdrant-storage
+        persistentVolumeClaim:
+          claimName: qdrant-storage-pvc
+      restartPolicy: Always
+
+---
+# Qdrant Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant
+  namespace: cheshire-cat
+  labels:
+    app: qdrant
+spec:
+  type: ClusterIP
+  ports:
+  - port: 6333
+    targetPort: 6333
+    name: qdrant-api
+  selector:
+    app: qdrant
+
+---
+# Cheshire Cat Core Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cheshire-cat-core
+  namespace: cheshire-cat
+  labels:
+    app: cheshire-cat-core
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: cheshire-cat-core
+  template:
+    metadata:
+      labels:
+        app: cheshire-cat-core
+    spec:
+      containers:
+      - name: cheshire-cat-core
+        image: ghcr.io/cheshire-cat-ai/core:latest
+        ports:
+        - containerPort: 80
+        env:
+        - name: CCAT_DEBUG
+          value: "true"
+        - name: CCAT_LOG_LEVEL
+          value: "INFO"
+        - name: CCAT_CORE_HOST
+          value: "localhost"
+        - name: CCAT_CORE_PORT
+          value: "80"
+        - name: CCAT_CORE_USE_SECURE_PROTOCOLS
+          value: "false"
+        - name: CCAT_HTTPS_PROXY_MODE
+          value: "false"
+        - name: CCAT_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: cheshire-cat-secrets
+              key: JWT_SECRET
+        - name: CCAT_JWT_ALGORITHM
+          value: "HS256"
+        - name: CCAT_JWT_EXPIRE_MINUTES
+          value: "1440"
+        - name: CCAT_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cheshire-cat-secrets
+              key: API_KEY
+        - name: CCAT_API_KEY_WS
+          valueFrom:
+            secretKeyRef:
+              name: cheshire-cat-secrets
+              key: API_KEY_WS
+        - name: CCAT_QDRANT_HOST
+          value: "qdrant"
+        - name: CCAT_QDRANT_PORT
+          value: "6333"
+        - name: CCAT_QDRANT_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cheshire-cat-secrets
+              key: QDRANT_API_KEY
+        - name: CCAT_CORS_ALLOWED_ORIGINS
+          value: "http://localhost"
+        - name: CCAT_CORS_ENABLED
+          value: "true"
+        # Override Kubernetes auto-generated service variables
+        - name: QDRANT_SERVICE_HOST
+          value: "qdrant"
+        - name: QDRANT_SERVICE_PORT
+          value: "6333"
+        - name: QDRANT_PORT
+          value: "6333"
+        volumeMounts:
+        - name: static
+          mountPath: /app/cat/static
+        - name: plugins
+          mountPath: /app/cat/plugins
+        - name: data
+          mountPath: /app/cat/data
+        livenessProbe:
+          httpGet:
+            path: /openapi.json
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /openapi.json
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "500m"
+          limits:
+            memory: "2Gi"
+            cpu: "1000m"
+      volumes:
+      - name: static
+        persistentVolumeClaim:
+          claimName: static-pvc
+      - name: plugins
+        persistentVolumeClaim:
+          claimName: plugins-pvc
+      - name: data
+        persistentVolumeClaim:
+          claimName: data-pvc
+      restartPolicy: Always
+
+---
+# Cheshire Cat Core Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: cheshire-cat-core
+  namespace: cheshire-cat
+  labels:
+    app: cheshire-cat-core
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+  selector:
+    app: cheshire-cat-core
+
+---
+# NGINX Reverse Proxy Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: nginx
+  namespace: cheshire-cat
+  labels:
+    app: nginx
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: nginx
+  template:
+    metadata:
+      labels:
+        app: nginx
+    spec:
+      containers:
+      - name: nginx
+        image: nginx:alpine
+        ports:
+        - containerPort: 80
+        volumeMounts:
+        - name: nginx-config
+          mountPath: /etc/nginx/nginx.conf
+          subPath: nginx.conf
+          readOnly: true
+        - name: static
+          mountPath: /var/www/static
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: "128Mi"
+            cpu: "100m"
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+      volumes:
+      - name: nginx-config
+        configMap:
+          name: nginx-config
+      - name: static
+        persistentVolumeClaim:
+          claimName: static-pvc
+      restartPolicy: Always
+
+---
+# NGINX Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: nginx
+  namespace: cheshire-cat
+  labels:
+    app: nginx
+spec:
+  type: NodePort
+  ports:
+  - port: 80
+    targetPort: 80
+    nodePort: 30080
+    name: http
+  selector:
+    app: nginx 

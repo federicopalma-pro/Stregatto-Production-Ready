@@ -1,0 +1,68 @@
+{{- if .Values.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: qdrant-storage-pvc
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: qdrant
+    component: storage
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.qdrant.size }}
+  storageClassName: {{ .Values.persistence.storageClass }}
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: static-pvc
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: cheshire-cat
+    component: static
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.static.size }}
+  storageClassName: {{ .Values.persistence.storageClass }}
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: plugins-pvc
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: cheshire-cat
+    component: plugins
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.plugins.size }}
+  storageClassName: {{ .Values.persistence.storageClass }}
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-pvc
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: cheshire-cat
+    component: data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.data.size }}
+  storageClassName: {{ .Values.persistence.storageClass }}
+{{- end }} 

@@ -1,0 +1,115 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cheshire-cat-core
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: cheshire-cat-core
+spec:
+  replicas: {{ .Values.replicaCount.cheshireCat }}
+  selector:
+    matchLabels:
+      app: cheshire-cat-core
+  template:
+    metadata:
+      labels:
+        app: cheshire-cat-core
+    spec:
+      containers:
+      - name: cheshire-cat-core
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.cheshireCat.port }}
+        env:
+        - name: CCAT_DEBUG
+          value: {{ .Values.cheshireCat.debug | quote }}
+        - name: CCAT_LOG_LEVEL
+          value: {{ .Values.cheshireCat.logLevel | quote }}
+        - name: CCAT_CORE_HOST
+          value: {{ .Values.cheshireCat.host | quote }}
+        - name: CCAT_CORE_PORT
+          value: {{ .Values.cheshireCat.port | quote }}
+        - name: CCAT_CORE_USE_SECURE_PROTOCOLS
+          value: {{ .Values.cheshireCat.useSecureProtocols | quote }}
+        - name: CCAT_HTTPS_PROXY_MODE
+          value: {{ .Values.cheshireCat.httpsProxyMode | quote }}
+        - name: CCAT_JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: cheshire-cat-secrets
+              key: JWT_SECRET
+        - name: CCAT_JWT_ALGORITHM
+          value: {{ .Values.cheshireCat.jwt.algorithm | quote }}
+        - name: CCAT_JWT_EXPIRE_MINUTES
+          value: {{ .Values.cheshireCat.jwt.expireMinutes | quote }}
+        - name: CCAT_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cheshire-cat-secrets
+              key: API_KEY
+        - name: CCAT_API_KEY_WS
+          valueFrom:
+            secretKeyRef:
+              name: cheshire-cat-secrets
+              key: API_KEY_WS
+        - name: CCAT_QDRANT_HOST
+          value: "qdrant"
+        - name: CCAT_QDRANT_PORT
+          value: {{ .Values.qdrant.service.port | quote }}
+        - name: CCAT_QDRANT_API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cheshire-cat-secrets
+              key: QDRANT_API_KEY
+        - name: CCAT_CORS_ALLOWED_ORIGINS
+          value: {{ .Values.cheshireCat.cors.allowedOrigins | quote }}
+        - name: CCAT_CORS_ENABLED
+          value: {{ .Values.cheshireCat.cors.enabled | quote }}
+        - name: QDRANT_SERVICE_HOST
+          value: "qdrant"
+        - name: QDRANT_SERVICE_PORT
+          value: {{ .Values.qdrant.service.port | quote }}
+        - name: QDRANT_PORT
+          value: {{ .Values.qdrant.service.port | quote }}
+        volumeMounts:
+        - name: static
+          mountPath: /app/cat/static
+        - name: plugins
+          mountPath: /app/cat/plugins
+        - name: data
+          mountPath: /app/cat/data
+        livenessProbe:
+          httpGet:
+            path: /openapi.json
+            port: {{ .Values.cheshireCat.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
+        readinessProbe:
+          httpGet:
+            path: /openapi.json
+            port: {{ .Values.cheshireCat.port }}
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 5
+        resources:
+          requests:
+            memory: {{ .Values.cheshireCat.resources.requests.memory }}
+            cpu: {{ .Values.cheshireCat.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.cheshireCat.resources.limits.memory }}
+            cpu: {{ .Values.cheshireCat.resources.limits.cpu }}
+      volumes:
+      - name: static
+        persistentVolumeClaim:
+          claimName: static-pvc
+      - name: plugins
+        persistentVolumeClaim:
+          claimName: plugins-pvc
+      - name: data
+        persistentVolumeClaim:
+          claimName: data-pvc
+      restartPolicy: Always 

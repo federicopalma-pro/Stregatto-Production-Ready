@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: qdrant
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: qdrant
+spec:
+  type: ClusterIP
+  ports:
+  - port: {{ .Values.qdrant.service.port }}
+    targetPort: {{ .Values.qdrant.service.port }}
+    name: qdrant-api
+  selector:
+    app: qdrant 

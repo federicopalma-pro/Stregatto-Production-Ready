@@ -1,0 +1,19 @@
+apiVersion: v2
+name: cheshire-cat
+description: A Helm chart for Cheshire Cat AI - Production-ready deployment with Qdrant vector database
+type: application
+version: 1.0.0
+appVersion: "latest"
+maintainers:
+  - name: Cheshire Cat Team
+home: https://github.com/cheshire-cat-ai/core
+sources:
+  - https://github.com/cheshire-cat-ai/core
+keywords:
+  - ai
+  - chatbot
+  - llm
+  - vector-database
+  - qdrant
+annotations:
+  category: AI/ML 

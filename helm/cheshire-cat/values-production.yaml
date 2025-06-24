@@ -1,0 +1,91 @@
+# Production values for cheshire-cat
+# This is an example of production-ready configuration
+
+# Global settings
+global:
+  namespace: cheshire-cat-prod
+  storageClass: fast-ssd  # Use your production storage class
+
+# Image settings - use specific tags in production
+image:
+  repository: ghcr.io/cheshire-cat-ai/core
+  tag: "v1.6.0"  # Pin to specific version
+  pullPolicy: IfNotPresent
+
+# Service configuration for production
+service:
+  type: ClusterIP  # Use LoadBalancer or configure Ingress
+  port: 80
+
+# Ingress configuration (uncomment and configure for your environment)
+# ingress:
+#   enabled: true
+#   className: nginx
+#   annotations:
+#     cert-manager.io/cluster-issuer: "letsencrypt-prod"
+#     nginx.ingress.kubernetes.io/proxy-read-timeout: "86400"
+#   hosts:
+#     - host: cheshire-cat.example.com
+#       paths:
+#         - path: /
+#           pathType: Prefix
+#   tls:
+#     - secretName: cheshire-cat-tls
+#       hosts:
+#         - cheshire-cat.example.com
+
+# Persistent storage - larger sizes for production
+persistence:
+  enabled: true
+  storageClass: fast-ssd
+  qdrant:
+    size: 100Gi
+  static:
+    size: 10Gi
+  plugins:
+    size: 50Gi
+  data:
+    size: 50Gi
+
+# Security - MUST be changed for production
+secrets:
+  # Generate secure random strings for production
+  jwtSecret: "CHANGE-ME-SECURE-JWT-SECRET-MIN-32-CHARS"
+  apiKey: "CHANGE-ME-SECURE-API-KEY"
+  apiKeyWs: "CHANGE-ME-SECURE-WS-KEY"
+  qdrantApiKey: "CHANGE-ME-SECURE-QDRANT-KEY"
+
+# Cheshire Cat production configuration
+cheshireCat:
+  debug: false
+  logLevel: WARNING
+  cors:
+    enabled: true
+    allowedOrigins: "https://cheshire-cat.example.com"
+  resources:
+    requests:
+      memory: "2Gi"
+      cpu: "1000m"
+    limits:
+      memory: "4Gi"
+      cpu: "2000m"
+
+# Qdrant production configuration
+qdrant:
+  resources:
+    requests:
+      memory: "1Gi"
+      cpu: "500m"
+    limits:
+      memory: "2Gi"
+      cpu: "1000m"
+
+# NGINX production configuration
+nginx:
+  resources:
+    requests:
+      memory: "256Mi"
+      cpu: "200m"
+    limits:
+      memory: "512Mi"
+      cpu: "500m" 

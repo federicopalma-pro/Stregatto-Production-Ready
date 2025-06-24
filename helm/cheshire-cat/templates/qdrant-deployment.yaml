@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: qdrant
+  namespace: {{ .Values.global.namespace }}
+  labels:
+    app: qdrant
+spec:
+  replicas: {{ .Values.replicaCount.qdrant }}
+  selector:
+    matchLabels:
+      app: qdrant
+  template:
+    metadata:
+      labels:
+        app: qdrant
+    spec:
+      containers:
+      - name: qdrant
+        image: "{{ .Values.qdrant.image.repository }}:{{ .Values.qdrant.image.tag }}"
+        imagePullPolicy: {{ .Values.qdrant.image.pullPolicy }}
+        ports:
+        - containerPort: {{ .Values.qdrant.service.port }}
+        env:
+        - name: QDRANT__SERVICE__API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: cheshire-cat-secrets
+              key: QDRANT_API_KEY
+        - name: QDRANT__SERVICE__ENABLE_TLS
+          value: {{ .Values.qdrant.config.enableTls | quote }}
+        - name: QDRANT__LOG_LEVEL
+          value: {{ .Values.qdrant.config.logLevel | quote }}
+        {{- if .Values.persistence.enabled }}
+        volumeMounts:
+        - name: qdrant-storage
+          mountPath: /qdrant/storage
+        {{- end }}
+        livenessProbe:
+          tcpSocket:
+            port: {{ .Values.qdrant.service.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          tcpSocket:
+            port: {{ .Values.qdrant.service.port }}
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 5
+          failureThreshold: 3
+        resources:
+          requests:
+            memory: {{ .Values.qdrant.resources.requests.memory }}
+            cpu: {{ .Values.qdrant.resources.requests.cpu }}
+          limits:
+            memory: {{ .Values.qdrant.resources.limits.memory }}
+            cpu: {{ .Values.qdrant.resources.limits.cpu }}
+      {{- if .Values.persistence.enabled }}
+      volumes:
+      - name: qdrant-storage
+        persistentVolumeClaim:
+          claimName: qdrant-storage-pvc
+      {{- end }}
+      restartPolicy: Always 
